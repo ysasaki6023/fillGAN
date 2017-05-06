@@ -105,7 +105,7 @@ class fillGAN:
     def loadModel(self, model_path=None):
         if model_path: self.saver.restore(self.sess, model_path)
 
-    def buildGenerator(self,z,reuse=False,isTraining=True):
+    def buildGenerator(self,z,mask,reuse=False,isTraining=True):
         dim_0_h,dim_0_w = self.imageSize[0],self.imageSize[1]
         dim_1_h,dim_1_w = self.calcImageSize(dim_0_h, dim_0_w, stride=2)
         dim_2_h,dim_2_w = self.calcImageSize(dim_1_h, dim_1_w, stride=2)
@@ -122,23 +122,44 @@ class fillGAN:
             h = self._conv2d(h,self.g_conv1_w, stride=2) + self.g_conv1_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm1c")
             h = self.leakyReLU(h)
+            h_conv1 = h
 
             # conv2
             self.g_conv2_w, self.g_conv2_b = self._conv_variable([5,5,64,128],name="conv2")
             h = self._conv2d(h,self.g_conv2_w, stride=2) + self.g_conv2_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm2c")
             h = self.leakyReLU(h)
+            h_conv2 = h
 
             # conv3
             self.g_conv3_w, self.g_conv3_b = self._conv_variable([5,5,128,256],name="conv3")
             h = self._conv2d(h,self.g_conv3_w, stride=2) + self.g_conv3_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm3c")
             h = self.leakyReLU(h)
+            h_conv3 = h
 
             # conv4
             self.g_conv4_w, self.g_conv4_b = self._conv_variable([5,5,256,512],name="conv4")
             h = self._conv2d(h,self.g_conv4_w, stride=2) + self.g_conv4_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm4c")
+            h = self.leakyReLU(h)
+
+            # proc1
+            self.g_proc1_w, self.g_proc1_b = self._conv_variable([5,5,512,512],name="proc1")
+            h = self._conv2d(h,self.g_proc1_w, stride=1) + self.g_proc1_b
+            h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm1p")
+            h = self.leakyReLU(h)
+
+            # proc2
+            self.g_proc2_w, self.g_proc2_b = self._conv_variable([5,5,512,512],name="proc2")
+            h = self._conv2d(h,self.g_proc2_w, stride=1) + self.g_proc2_b
+            h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm2p")
+            h = self.leakyReLU(h)
+
+            # proc1
+            self.g_proc3_w, self.g_proc3_b = self._conv_variable([5,5,512,512],name="proc3")
+            h = self._conv2d(h,self.g_proc3_w, stride=1) + self.g_proc3_b
+            h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm3p")
             h = self.leakyReLU(h)
 
             # deconv4
@@ -148,23 +169,29 @@ class fillGAN:
             h = tf.nn.relu(h)
 
             # deconv3
-            self.g_deconv3_w, self.g_deconv3_b = self._deconv_variable([5,5,256,128],name="deconv3")
+            h = tf.concat([h,h_conv3],axis=3)
+            self.g_deconv3_w, self.g_deconv3_b = self._deconv_variable([5,5,256+256,128],name="deconv3")
             h = self._deconv2d(h,self.g_deconv3_w, output_shape=[self.nBatch,dim_2_h,dim_2_w,128], stride=2) + self.g_deconv3_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="gNorm3d")
             h = tf.nn.relu(h)
 
             # deconv2
-            self.g_deconv2_w, self.g_deconv2_b = self._deconv_variable([5,5,128,64],name="deconv2")
+            h = tf.concat([h,h_conv2],axis=3)
+            self.g_deconv2_w, self.g_deconv2_b = self._deconv_variable([5,5,128+128,64],name="deconv2")
             h = self._deconv2d(h,self.g_deconv2_w, output_shape=[self.nBatch,dim_1_h,dim_1_w,64], stride=2) + self.g_deconv2_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="gNorm2d")
             h = tf.nn.relu(h)
 
             # deconv1
-            self.g_deconv1_w, self.g_deconv1_b = self._deconv_variable([5,5,64,3],name="deconv1")
+            h = tf.concat([h,h_conv1],axis=3)
+            self.g_deconv1_w, self.g_deconv1_b = self._deconv_variable([5,5,64+64,3],name="deconv1")
             h = self._deconv2d(h,self.g_deconv1_w, output_shape=[self.nBatch,dim_0_h,dim_0_w,3], stride=2) + self.g_deconv1_b
 
             # sigmoid
             y = tf.tanh(h)
+
+            # add back mask
+            y = mask*z + (1-mask)*y
 
             ### summary
             if reuse:
@@ -245,8 +272,8 @@ class fillGAN:
 
         self.y_real = self.img_original
 
-        self.y_fake  = self.buildGenerator(self.img_dropped)
-        self.y_sample = self.buildGenerator(self.img_dropped,reuse=True,isTraining=False)
+        self.y_fake  = self.buildGenerator(self.img_dropped,self.masks)
+        self.y_sample = self.buildGenerator(self.img_dropped,self.masks,reuse=True,isTraining=False)
 
         self.d_real  = self.buildDiscriminator(self.y_real)
         self.d_fake  = self.buildDiscriminator(self.y_fake,reuse=True)
@@ -256,9 +283,10 @@ class fillGAN:
         self.d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.d_fake,labels=tf.zeros_like(self.d_fake)))
         self.d_loss      = self.d_loss_real + self.d_loss_fake
 
-        self.g_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.d_fake,labels=tf.ones_like (self.d_fake)))
-        self.g_loss_same = tf.reduce_mean((self.y_fake*self.masks - self.img_dropped*self.masks)**2)
-        self.g_loss      = self.g_loss_real + self.g_loss_same
+        self.g_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.d_fake,labels=tf.ones_like (self.d_fake)))
+        #self.g_loss_same = tf.reduce_mean((self.y_fake*self.masks - self.img_dropped*self.masks)**2)
+        self.g_loss_same = 0.
+        self.g_loss      = self.g_loss_fake + self.g_loss_same
 
         # define optimizer
         self.g_optimizer = tf.train.AdamOptimizer(self.learnRate,beta1=0.5).minimize(self.g_loss, var_list=[x for x in tf.trainable_variables() if "Generator"     in x.name])
@@ -268,13 +296,13 @@ class fillGAN:
         tf.summary.scalar("d_loss_real"   ,self.d_loss_real)
         tf.summary.scalar("d_loss_fake"   ,self.d_loss_fake)
         tf.summary.scalar("d_loss"      ,self.d_loss)
-        tf.summary.scalar("g_loss_real" ,self.g_loss_real)
+        tf.summary.scalar("g_loss_fake" ,self.g_loss_fake)
         tf.summary.scalar("g_loss_same" ,self.g_loss_same)
         tf.summary.scalar("g_loss"      ,self.g_loss)
 
         #############################
         # define session
-        config = tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.35))
+        config = tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.50))
         self.sess = tf.Session(config=config)
 
         #############################
@@ -308,6 +336,7 @@ class fillGAN:
 
         step = -1
         start = time.time()
+        d_loss, g_loss = None, 1.0
         while True:
             step += 1
 
@@ -315,7 +344,12 @@ class fillGAN:
             #batch_z        = np.random.uniform(-1.,+1.,[self.nBatch,self.zdim]).astype(np.float32)
 
             # update generator
+            #if d_loss==None or d_loss>=g_loss:
+            #    _,d_loss,y_fake,y_real,summary = self.sess.run([self.d_optimizer,self.d_loss,self.y_fake,self.y_real,self.summary],feed_dict={self.img_dropped:batch_dropped, self.img_original:batch_original, self.masks:batch_masks})
+            #else:
+            #    _,g_loss                = self.sess.run([self.g_optimizer,self.g_loss],feed_dict={self.img_dropped:batch_dropped, self.masks:batch_masks})
             _,d_loss,y_fake,y_real,summary = self.sess.run([self.d_optimizer,self.d_loss,self.y_fake,self.y_real,self.summary],feed_dict={self.img_dropped:batch_dropped, self.img_original:batch_original, self.masks:batch_masks})
+            _,g_loss                = self.sess.run([self.g_optimizer,self.g_loss],feed_dict={self.img_dropped:batch_dropped, self.masks:batch_masks})
             _,g_loss                = self.sess.run([self.g_optimizer,self.g_loss],feed_dict={self.img_dropped:batch_dropped, self.masks:batch_masks})
 
             if step>0 and step%10==0:
