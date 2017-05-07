@@ -129,14 +129,14 @@ class fillGAN:
             h = self._conv2d(h,self.g_conv2_w, stride=2) + self.g_conv2_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm2c")
             h = self.leakyReLU(h)
-            h_conv2 = h
+            #h_conv2 = h
 
             # conv3
             self.g_conv3_w, self.g_conv3_b = self._conv_variable([5,5,128,256],name="conv3")
             h = self._conv2d(h,self.g_conv3_w, stride=2) + self.g_conv3_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=self.isTraining, scope="dNorm3c")
             h = self.leakyReLU(h)
-            h_conv3 = h
+            #h_conv3 = h
 
             # conv4
             self.g_conv4_w, self.g_conv4_b = self._conv_variable([5,5,256,512],name="conv4")
@@ -169,22 +169,22 @@ class fillGAN:
             h = tf.nn.relu(h)
 
             # deconv3
-            h = tf.concat([h,h_conv3],axis=3)
-            self.g_deconv3_w, self.g_deconv3_b = self._deconv_variable([5,5,256+256,128],name="deconv3")
+            #h = tf.concat([h,h_conv3],axis=3)
+            self.g_deconv3_w, self.g_deconv3_b = self._deconv_variable([5,5,256,128],name="deconv3")
             h = self._deconv2d(h,self.g_deconv3_w, output_shape=[self.nBatch,dim_2_h,dim_2_w,128], stride=2) + self.g_deconv3_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="gNorm3d")
             h = tf.nn.relu(h)
 
             # deconv2
-            h = tf.concat([h,h_conv2],axis=3)
-            self.g_deconv2_w, self.g_deconv2_b = self._deconv_variable([5,5,128+128,64],name="deconv2")
+            #h = tf.concat([h,h_conv2],axis=3)
+            self.g_deconv2_w, self.g_deconv2_b = self._deconv_variable([5,5,128,64],name="deconv2")
             h = self._deconv2d(h,self.g_deconv2_w, output_shape=[self.nBatch,dim_1_h,dim_1_w,64], stride=2) + self.g_deconv2_b
             h = tf.contrib.layers.batch_norm(h, decay=0.9, updates_collections=None, epsilon=1e-5, scale=True, is_training=isTraining, scope="gNorm2d")
             h = tf.nn.relu(h)
 
             # deconv1
-            h = tf.concat([h,h_conv1],axis=3)
-            self.g_deconv1_w, self.g_deconv1_b = self._deconv_variable([5,5,64+64,3],name="deconv1")
+            #h = tf.concat([h,h_conv1],axis=3)
+            self.g_deconv1_w, self.g_deconv1_b = self._deconv_variable([5,5,64,3],name="deconv1")
             h = self._deconv2d(h,self.g_deconv1_w, output_shape=[self.nBatch,dim_0_h,dim_0_w,3], stride=2) + self.g_deconv1_b
 
             # sigmoid
